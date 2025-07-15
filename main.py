@@ -1,7 +1,10 @@
+from flask import Flask, jsonify
 import speedtest
 import socket
 import time
 import statistics
+
+app = Flask(__name__)
 
 def calculate_jitter(ping_times):
     """Calculate jitter (variation in ping times)"""
@@ -24,18 +27,13 @@ def measure_packet_loss(host="8.8.8.8", count=10, timeout=1):
     loss_percentage = (lost_packets / count) * 100
     return loss_percentage
 
+@app.route('/speedtest')
 def perform_speed_test():
     print(" Initializing Speed Test...")
     try:
         st = speedtest.Speedtest()
         st.get_servers()
         best_server = st.get_best_server()
-        
-        print(f"\n Best server found:")
-        print(f"   Host: {best_server['host']}")
-        print(f"   Location: {best_server['name']}, {best_server['country']}")
-        print(f"   Sponsor: {best_server['sponsor']}")
-        print(f"   Latency: {best_server['latency']:.2f} ms\n")
         
         # Measure ping times for jitter calculation
         ping_times = []
@@ -61,16 +59,23 @@ def perform_speed_test():
         download_mbps = download_speed / 1_000_000
         upload_mbps = upload_speed / 1_000_000
         
-        # Display results
-        print("\n Speed Test Results:")
-        print(f"   Download Speed: {download_mbps:.2f} Mbps")
-        print(f"   Upload Speed:   {upload_mbps:.2f} Mbps")
-        print(f"   Ping:           {avg_ping:.2f} ms")
-        print(f"   Jitter:         {jitter:.2f} ms")
-        print(f"   Packet Loss:    {packet_loss:.2f} %\n")
+        return jsonify({
+            "best_server": {
+                "host": best_server['host'],
+                "location": f"{best_server['name']}, {best_server['country']}",
+                "sponsor": best_server['sponsor'],
+                "latency": round(best_server['latency'], 2)
+            },
+            "download": round(download_mbps, 2),
+            "upload": round(upload_mbps, 2),
+            "ping": round(avg_ping, 2),
+            "jitter": round(jitter, 2),
+            "packet_loss": round(packet_loss, 2)
+        })
+    
     
     except Exception as e:
-        print(" Error during speed test:", e)
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    perform_speed_test()
+    app.run(debug=True)
